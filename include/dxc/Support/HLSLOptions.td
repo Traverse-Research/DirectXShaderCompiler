@@ -283,6 +283,8 @@ def disable_payload_qualifiers : Flag<["-", "/"], "disable-payload-qualifiers">,
   HelpText<"Disables support for payload access qualifiers for raytracing payloads in SM 6.7.">;
 def disable_exception_handling : Flag<["-", "/"], "disable-exception-handling">, Group<hlslcomp_Group>, Flags<[DriverOption, HelpHidden]>,
   HelpText<"Disable dxc handling of exceptions">;
+def enable_templates: Flag<["-", "/"], "enable-templates">, Group<hlslcomp_Group>, Flags<[CoreOption]>,
+  HelpText<"Enable template support for HLSL.">;
 
 // Used with API only
 def skip_serialization : Flag<["-", "/"], "skip-serialization">, Group<hlslcore_Group>, Flags<[CoreOption, HelpHidden]>,

@@ -159,6 +159,7 @@ public:
   bool EnableDX9CompatMode;
   bool EnableFXCCompatMode;
   bool EnablePayloadAccessQualifiers;
+  bool EnableTemplates;
   // HLSL Change Ends
 
   bool SPIRV = false;  // SPIRV Change
