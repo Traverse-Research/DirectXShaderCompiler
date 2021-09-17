@@ -26,7 +26,13 @@ HRESULT StringCchCopyEx(LPSTR pszDest, size_t cchDest, LPCSTR pszSrc,
   assert(dwFlags == 0 && "dwFlag values not supported in StringCchCopyEx");
   char *zPtr = 0;
 
+#if ANDROID
+  auto srclen = strnlen(pszSrc, cchDest);
+  strncpy(pszDest, pszSrc, cchDest);
+  zPtr = pszDest + srclen;
+#else
   zPtr = stpncpy(pszDest, pszSrc, cchDest);
+#endif
 
   if (ppszDestEnd)
     *ppszDestEnd = zPtr;
@@ -146,6 +152,7 @@ int _wcsnicmp(const wchar_t *str1, const wchar_t *str2, size_t n) {
   return str1[i] - str2[i];
 }
 
+#if !ANDROID
 unsigned char _BitScanForward(unsigned long * Index, unsigned long Mask) {
   unsigned long l;
   if (!Mask) return 0;
@@ -153,6 +160,7 @@ unsigned char _BitScanForward(unsigned long * Index, unsigned long Mask) {
   *Index = l;
   return 1;
 }
+#endif
 
 HRESULT CoGetMalloc(DWORD dwMemContext, IMalloc **ppMalloc) {
   *ppMalloc = new IMalloc;
