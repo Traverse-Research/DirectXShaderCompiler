@@ -280,6 +280,21 @@ void EmitVisitor::emitDebugLine(spv::Op op, const SourceLocation &loc,
       (op != spv::Op::OpReturn && op != spv::Op::OpFunction))
     return;
 
+  // Body-less Import prototype: suppress OpLine for any instruction
+  // inside the prototype's header (OpFunctionParameter, OpFunctionEnd).
+  // OpFunction itself is excluded — the OpLine that precedes it sits
+  // outside the function and is processed in the Types layout section,
+  // which is fine. The OpLines that the validator chokes on are the
+  // ones between OpFunction and OpFunctionParameter and between
+  // parameters / OpFunctionEnd; under spirv-val's current layout
+  // classification (OpLine -> FunctionDefinitions outside Types) those
+  // advance the section past FunctionDeclarations and trip the
+  // "declaration after definition" check on the prototype's own
+  // OpFunctionEnd. Skipping them here keeps the binary
+  // structurally-valid AND validator-clean.
+  if (inImportPrototype && op != spv::Op::OpFunction)
+    return;
+
   // Based on SPIR-V spec, OpSelectionMerge must immediately precede either an
   // OpBranchConditional or OpSwitch instruction. Similarly OpLoopMerge must
   // immediately precede either an OpBranch or OpBranchConditional instruction.
@@ -522,6 +537,12 @@ bool EmitVisitor::visit(SpirvFunction *fn, Phase phase) {
 
     if (fn->isEntryFunctionWrapper())
       inEntryFunctionWrapper = true;
+    // Body-less functions are Import prototypes (under
+    // -fspv-allow-import). Suppress OpLine for instructions inside
+    // their header — see the `inImportPrototype` flag in EmitVisitor.h
+    // for the rationale.
+    if (fn->isDeclaration())
+      inImportPrototype = true;
 
     // Emit OpFunction
     initInstruction(spv::Op::OpFunction, fn->getSourceLocation());
@@ -547,6 +568,7 @@ bool EmitVisitor::visit(SpirvFunction *fn, Phase phase) {
     initInstruction(spv::Op::OpFunctionEnd, /* SourceLocation */ {});
     finalizeInstruction(&mainBinary);
     inEntryFunctionWrapper = false;
+    inImportPrototype = false;
   }
 
   return true;
