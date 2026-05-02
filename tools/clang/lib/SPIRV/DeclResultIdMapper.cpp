@@ -1824,6 +1824,14 @@ SpirvFunction *DeclResultIdMapper::getOrRegisterFn(const FunctionDecl *fn) {
   if (fn->getAttr<HLSLExportAttr>()) {
     spvBuilder.decorateLinkage(nullptr, spirvFunction, fn->getName(),
                                spv::LinkageType::Export, fn->getLocation());
+  } else if (spirvOptions.allowImport && !fn->isImplicit()) {
+    // -fspv-allow-import is gated to lib_* profiles at SpirvEmitter
+    // construction, so reaching here implies a library compilation.
+    const FunctionDecl *defn = nullptr;
+    if (!fn->isDefined(defn)) {
+      spvBuilder.decorateLinkage(nullptr, spirvFunction, fn->getName(),
+                                 spv::LinkageType::Import, fn->getLocation());
+    }
   }
 
   // No need to dereference to get the pointer. Function returns that are

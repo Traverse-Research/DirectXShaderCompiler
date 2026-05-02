@@ -1334,6 +1334,12 @@ private:
                               const clang::FunctionDecl *,
                               bool isEntryFunction);
 
+  /// \brief Emits a body-less SpirvFunction (OpFunction / OpFunctionParameters
+  /// / OpFunctionEnd, no basic blocks) for the given declaration. Used to
+  /// model external functions for SPIR-V Import linkage when the user passes
+  /// -fspv-allow-import on a library target.
+  void emitImportFunctionPrototype(const clang::FunctionDecl *decl);
+
   /// \brief Helper function to run SPIRV-Tools optimizer's performance passes.
   /// Runs the SPIRV-Tools optimizer on the given SPIR-V module |mod|, and
   /// gets the info/warning/error messages via |messages|.
@@ -1582,6 +1588,11 @@ private:
   /// Whether the translated SPIR-V binary passes --before-hlsl-legalization
   /// option to spirv-val because of illegal function parameter scope.
   bool beforeHlslLegalization;
+
+  /// True when the overall compilation profile is `lib_*`. Stays true even
+  /// while emitting an entry function within the library, where
+  /// `spvContext.isLib()` flips to the entry's per-stage shader model kind.
+  bool isLibProfile = false;
 
   /// Mapping from methods to the decls to represent their implicit object
   /// parameters
