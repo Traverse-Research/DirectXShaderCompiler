@@ -223,9 +223,23 @@ bool SpirvModule::invokeVisitor(Visitor *visitor, bool reverseOrder) {
       if (!debugInstructions[i]->invokeVisitor(visitor))
         return false;
 
+    // SPIR-V Logical Layout (sec. 2.4) requires all function
+    // declarations (header-only) to precede any function definitions
+    // (with bodies). Under -fspv-allow-import we emit body-less
+    // prototypes for undefined external functions, but they're
+    // discovered in source order — interleaved with bodies coming
+    // from the same translation unit (e.g. helpers pulled in via
+    // #include). Two-pass emit keeps declarations first, definitions
+    // second; spirv-val rejects the binary otherwise with "Function
+    // declarations must appear before function definitions".
     for (auto fn : functions)
-      if (!fn->invokeVisitor(visitor, reverseOrder))
-        return false;
+      if (fn->isDeclaration())
+        if (!fn->invokeVisitor(visitor, reverseOrder))
+          return false;
+    for (auto fn : functions)
+      if (!fn->isDeclaration())
+        if (!fn->invokeVisitor(visitor, reverseOrder))
+          return false;
   }
 
   if (!visitor->visit(this, Visitor::Phase::Done))
