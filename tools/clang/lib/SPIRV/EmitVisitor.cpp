@@ -280,19 +280,21 @@ void EmitVisitor::emitDebugLine(spv::Op op, const SourceLocation &loc,
       (op != spv::Op::OpReturn && op != spv::Op::OpFunction))
     return;
 
-  // Body-less Import prototype: suppress OpLine for any instruction
-  // inside the prototype's header (OpFunctionParameter, OpFunctionEnd).
-  // OpFunction itself is excluded — the OpLine that precedes it sits
-  // outside the function and is processed in the Types layout section,
-  // which is fine. The OpLines that the validator chokes on are the
-  // ones between OpFunction and OpFunctionParameter and between
-  // parameters / OpFunctionEnd; under spirv-val's current layout
-  // classification (OpLine -> FunctionDefinitions outside Types) those
-  // advance the section past FunctionDeclarations and trip the
-  // "declaration after definition" check on the prototype's own
-  // OpFunctionEnd. Skipping them here keeps the binary
-  // structurally-valid AND validator-clean.
-  if (inImportPrototype && op != spv::Op::OpFunction)
+  // Body-less Import prototype: suppress OpLine for the *entire* emit
+  // window — including the OpLine that initInstruction would emit
+  // immediately before OpFunction itself. spirv-val's current layout
+  // classification (OpLine -> FunctionDefinitions outside Types)
+  // advances the section past FunctionDeclarations on any OpLine seen
+  // while in FunctionDeclarations: the OpLines between OpFunction and
+  // OpFunctionParameter trip the prototype's *own* OpFunctionEnd, and
+  // — more subtly — the OpLine that DXC emits *between* two
+  // consecutive prototypes (after the previous OpFunctionEnd, before
+  // this prototype's OpFunction) trips the *next* prototype's
+  // OpFunctionEnd. Skipping every OpLine inside the prototype's emit
+  // window keeps the binary structurally-valid AND validator-clean.
+  // Prototypes are dropped during link-time import resolution anyway,
+  // so the lost source-location info on them costs nothing.
+  if (inImportPrototype)
     return;
 
   // Based on SPIR-V spec, OpSelectionMerge must immediately precede either an
