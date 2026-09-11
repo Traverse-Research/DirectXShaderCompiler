@@ -613,6 +613,10 @@ SpirvEmitter::SpirvEmitter(CompilerInstance &ci)
   spvContext.setCurrentShaderModelKind(shaderModel->GetKind());
   spvContext.setMajorVersion(shaderModel->GetMajor());
   spvContext.setMinorVersion(shaderModel->GetMinor());
+  isLibProfile = shaderModel->IsLib();
+
+  if (spirvOptions.allowImport && !isLibProfile)
+    emitError("-fspv-allow-import requires a lib_* target profile", {});
   spirvOptions.signaturePacking =
       ci.getCodeGenOpts().HLSLSignaturePackingStrategy ==
       (unsigned)hlsl::DXIL::PackingStrategy::Optimized;
@@ -963,8 +967,15 @@ void SpirvEmitter::HandleTranslationUnit(ASTContext &context) {
       !dsetbindingsToCombineImageSampler.empty() ||
       spirvOptions.signaturePacking;
 
+  // SPIR-V modules with Import linkage attributes are not yet linked, so
+  // SPIRV-Tools' optimizer/legalizer passes (which assume every reachable
+  // function has a body) are not meaningful and would crash on the
+  // body-less Import prototypes. The expectation is that the user runs
+  // those passes after spirv-link has resolved the imports.
+  const bool skipPostCodegenPasses = spirvOptions.allowImport;
+
   // Run legalization passes
-  if (spirvOptions.codeGenHighLevel) {
+  if (spirvOptions.codeGenHighLevel || skipPostCodegenPasses) {
     beforeHlslLegalization = needsLegalization;
   } else {
     if (needsLegalization) {
@@ -1561,6 +1572,16 @@ bool SpirvEmitter::handleNodePayloadArrayType(const ParmVarDecl *decl,
 void SpirvEmitter::doFunctionDecl(const FunctionDecl *decl) {
   // Forward declaration of a function inside another.
   if (!decl->isThisDeclarationADefinition()) {
+    // In library targets with -fspv-allow-import, a function that is
+    // declared but never defined anywhere in the translation unit is
+    // emitted as a body-less prototype with Import linkage. The Import
+    // decoration itself is added by getOrRegisterFn().
+    const FunctionDecl *defn = nullptr;
+    if (isLibProfile && spirvOptions.allowImport &&
+        !decl->isImplicit() && !decl->isDefined(defn)) {
+      emitImportFunctionPrototype(decl);
+      return;
+    }
     addFunctionToWorkQueue(spvContext.getCurrentShaderModelKind(), decl,
                            /*isEntryFunction*/ false);
     return;
@@ -3224,8 +3245,17 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
   // Note that we always want the definition because Stmts/Exprs in the
   // function body reference the parameters in the definition.
   if (!callee) {
-    emitError("found undefined function", callExpr->getExprLoc());
-    return nullptr;
+    // In library targets with -fspv-allow-import, calls to undefined
+    // functions are emitted as references to an Import-linkage prototype
+    // so the resulting SPIR-V module can be linked against an external
+    // definition.
+    if (isLibProfile && spirvOptions.allowImport) {
+      callee = callExpr->getDirectCallee();
+    }
+    if (!callee) {
+      emitError("found undefined function", callExpr->getExprLoc());
+      return nullptr;
+    }
   }
 
   const auto paramTypeMatchesArgType = [](QualType paramType,
@@ -15802,6 +15832,30 @@ void SpirvEmitter::addFunctionToWorkQueue(hlsl::DXIL::ShaderKind shaderKind,
     functionInfoMap[fnDecl] = fnInfo;
     workQueue.push_back(fnInfo);
   }
+}
+
+void SpirvEmitter::emitImportFunctionPrototype(const FunctionDecl *decl) {
+  // The work queue is idempotent in addFunctionToWorkQueue, so doFunctionDecl
+  // is only invoked once per external prototype — no further dedup needed.
+  // getOrRegisterFn applies the Import LinkageAttributes decoration when the
+  // function has no definition and -fspv-allow-import is set.
+  SpirvFunction *func = declIdMapper.getOrRegisterFn(decl);
+
+  const QualType retType =
+      declIdMapper.getTypeAndCreateCounterForPotentialAliasVar(decl);
+  spvBuilder.beginFunction(retType, decl->getLocStart(), getFnName(decl),
+                           decl->hasAttr<HLSLPreciseAttr>(),
+                           decl->hasAttr<NoInlineAttr>(), func);
+
+  // OpFunctionParameter for each parameter; no basic blocks (Import
+  // linkage requires the function body to be absent).
+  for (uint32_t i = 0; i < decl->getNumParams(); ++i) {
+    const ParmVarDecl *paramDecl = decl->getParamDecl(i);
+    declIdMapper.createFnParam(paramDecl, i + 1,
+                               /*decorateIntrinsicAttrs*/ true);
+  }
+
+  spvBuilder.endFunction();
 }
 
 SpirvInstruction *

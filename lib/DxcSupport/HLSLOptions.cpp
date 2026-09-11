@@ -1114,6 +1114,8 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fspv_use_legacy_buffer_matrix_order, OPT_INVALID, false);
   opts.SpirvOptions.enableReflect =
       Args.hasFlag(OPT_fspv_reflect, OPT_INVALID, false);
+  opts.SpirvOptions.allowImport =
+      Args.hasFlag(OPT_fspv_allow_import, OPT_INVALID, false);
   opts.SpirvOptions.noWarnIgnoredFeatures =
       Args.hasFlag(OPT_Wno_vk_ignored_features, OPT_INVALID, false);
   opts.SpirvOptions.noWarnEmulatedFeatures =
@@ -1296,6 +1298,7 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fspv_flatten_resource_arrays, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_reduce_load_size, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_reflect, OPT_INVALID, false) ||
+      Args.hasFlag(OPT_fspv_allow_import, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_fix_func_call_arguments, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_print_all, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_use_emulated_heap, OPT_INVALID, false) ||

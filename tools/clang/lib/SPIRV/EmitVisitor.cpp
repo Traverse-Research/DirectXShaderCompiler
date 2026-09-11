@@ -280,6 +280,23 @@ void EmitVisitor::emitDebugLine(spv::Op op, const SourceLocation &loc,
       (op != spv::Op::OpReturn && op != spv::Op::OpFunction))
     return;
 
+  // Body-less Import prototype: suppress OpLine for the *entire* emit
+  // window — including the OpLine that initInstruction would emit
+  // immediately before OpFunction itself. spirv-val's current layout
+  // classification (OpLine -> FunctionDefinitions outside Types)
+  // advances the section past FunctionDeclarations on any OpLine seen
+  // while in FunctionDeclarations: the OpLines between OpFunction and
+  // OpFunctionParameter trip the prototype's *own* OpFunctionEnd, and
+  // — more subtly — the OpLine that DXC emits *between* two
+  // consecutive prototypes (after the previous OpFunctionEnd, before
+  // this prototype's OpFunction) trips the *next* prototype's
+  // OpFunctionEnd. Skipping every OpLine inside the prototype's emit
+  // window keeps the binary structurally-valid AND validator-clean.
+  // Prototypes are dropped during link-time import resolution anyway,
+  // so the lost source-location info on them costs nothing.
+  if (inImportPrototype)
+    return;
+
   // Based on SPIR-V spec, OpSelectionMerge must immediately precede either an
   // OpBranchConditional or OpSwitch instruction. Similarly OpLoopMerge must
   // immediately precede either an OpBranch or OpBranchConditional instruction.
@@ -522,6 +539,12 @@ bool EmitVisitor::visit(SpirvFunction *fn, Phase phase) {
 
     if (fn->isEntryFunctionWrapper())
       inEntryFunctionWrapper = true;
+    // Body-less functions are Import prototypes (under
+    // -fspv-allow-import). Suppress OpLine for instructions inside
+    // their header — see the `inImportPrototype` flag in EmitVisitor.h
+    // for the rationale.
+    if (fn->isDeclaration())
+      inImportPrototype = true;
 
     // Emit OpFunction
     initInstruction(spv::Op::OpFunction, fn->getSourceLocation());
@@ -547,6 +570,7 @@ bool EmitVisitor::visit(SpirvFunction *fn, Phase phase) {
     initInstruction(spv::Op::OpFunctionEnd, /* SourceLocation */ {});
     finalizeInstruction(&mainBinary);
     inEntryFunctionWrapper = false;
+    inImportPrototype = false;
   }
 
   return true;

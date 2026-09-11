@@ -397,6 +397,8 @@ def fspv_use_legacy_buffer_matrix_order: Flag<["-"], "fspv-use-legacy-buffer-mat
   HelpText<"Assume the legacy matrix order (row major) when accessing raw buffers (e.g., ByteAdddressBuffer)">;
 def fspv_reflect: Flag<["-"], "fspv-reflect">, Group<spirv_Group>, Flags<[CoreOption, DriverOption]>,
   HelpText<"Emit additional SPIR-V instructions to aid reflection">;
+def fspv_allow_import: Flag<["-"], "fspv-allow-import">, Group<spirv_Group>, Flags<[CoreOption, DriverOption]>,
+  HelpText<"Allow undefined external functions in library targets and emit Import linkage decorations for them">;
 def fspv_debug_EQ : Joined<["-"], "fspv-debug=">, Group<spirv_Group>, Flags<[CoreOption, DriverOption]>,
   HelpText<"Specify whitelist of debug info category (file -> source -> line, tool, vulkan-with-source)">;
 def fspv_extension_EQ : Joined<["-"], "fspv-extension=">, Group<spirv_Group>, Flags<[CoreOption, DriverOption]>,

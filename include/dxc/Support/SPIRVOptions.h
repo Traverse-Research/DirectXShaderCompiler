@@ -53,6 +53,7 @@ struct SpirvCodeGenOptions {
   bool enable16BitTypes = false;
   bool finiteMathOnly = false;
   bool enableReflect = false;
+  bool allowImport = false;
   bool invertY = false; // Additive inverse
   bool invertW = false; // Multiplicative inverse
   bool noWarnEmulatedFeatures = false;

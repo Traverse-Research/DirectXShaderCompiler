@@ -221,7 +221,7 @@ public:
         debugMainFileId(0), debugInfoExtInstId(0), debugLineStart(0),
         debugLineEnd(0), debugColumnStart(0), debugColumnEnd(0),
         lastOpWasMergeInst(false), inEntryFunctionWrapper(false),
-        hlslVersion(0) {}
+        inImportPrototype(false), hlslVersion(0) {}
 
   ~EmitVisitor();
 
@@ -493,6 +493,17 @@ private:
   bool lastOpWasMergeInst;
   // True if currently it enters an entry function wrapper.
   bool inEntryFunctionWrapper;
+  // True while emitting a body-less Import-linkage function prototype
+  // (the form -fspv-allow-import emits for undefined external functions).
+  // Used by emitDebugLine to suppress OpLine instructions inside the
+  // prototype's header — they're structurally legal per SPIR-V spec but
+  // confuse spirv-val's layout pass into advancing past
+  // FunctionDeclarations on the first OpLine, which then flags the
+  // prototype's own OpFunctionEnd as a "declaration after definition"
+  // violation. See `external/SPIRV-Tools` upstream issue: OpLine in
+  // FunctionDeclarations layout section is misclassified as
+  // FunctionDefinitions.
+  bool inImportPrototype;
   // Map of filename string id to the id of its DebugSource instruction. When
   // generating OpSource instruction without a result id, use 1 to remember it
   // was generated.
