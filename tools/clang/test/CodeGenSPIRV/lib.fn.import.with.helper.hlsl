@@ -30,11 +30,11 @@
 
 // The Import prototype must appear before any function definitions
 // AND must contain no OpLine instructions inside its header.
-// CHECK: %external_helper = OpFunction %void None
+// CHECK: %external_helper = OpFunction %float None
 // CHECK-NEXT: OpFunctionParameter
 // CHECK-NEXT: OpFunctionEnd
-// CHECK: %inline_helper = OpFunction
-// CHECK: %caller = OpFunction
+// CHECK-DAG: %inline_helper = OpFunction
+// CHECK-DAG: %caller = OpFunction
 
 float external_helper(float a);
 

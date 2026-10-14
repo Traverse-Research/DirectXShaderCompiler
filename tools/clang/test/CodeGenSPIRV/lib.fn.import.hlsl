@@ -7,16 +7,17 @@
 
 // CHECK-DAG: OpCapability Linkage
 
-// The Import prototype must be referenced as the callee of OpFunctionCall.
 // CHECK-DAG: OpDecorate %external_helper LinkageAttributes "external_helper" Import
 
-// CHECK: OpFunctionCall %void %external_helper
-
-// The prototype itself must have parameters but no entry block.
+// The prototype itself must have parameters but no entry block, and as a
+// declaration it precedes every function definition.
 // CHECK: %external_helper = OpFunction %void None
 // CHECK-NEXT: OpFunctionParameter
 // CHECK-NEXT: OpFunctionParameter
 // CHECK-NEXT: OpFunctionEnd
+
+// The Import prototype must be referenced as the callee of OpFunctionCall.
+// CHECK: OpFunctionCall %void %external_helper
 
 void external_helper(float a, out float result);
 
