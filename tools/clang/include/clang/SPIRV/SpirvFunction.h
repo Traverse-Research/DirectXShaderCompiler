@@ -94,6 +94,12 @@ public:
   void addVariable(SpirvVariable *);
   void addBasicBlock(SpirvBasicBlock *);
 
+  // True if this is a function declaration (header-only, no body), as
+  // emitted under -fspv-allow-import for undefined external functions.
+  // Per SPIR-V Logical Layout (sec. 2.4), declarations precede
+  // definitions in the function section.
+  bool isDeclaration() const { return basicBlocks.empty(); }
+
   /// Adds the given instruction as the first instruction of this SPIR-V
   /// function body.
   void addFirstInstruction(SpirvInstruction *inst) {
