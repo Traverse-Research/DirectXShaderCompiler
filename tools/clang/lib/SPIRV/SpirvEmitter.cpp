@@ -868,10 +868,20 @@ void SpirvEmitter::HandleTranslationUnit(ASTContext &context) {
     }
   }
 
+  // Execution modes requested on the command line apply to every entry point.
+  // `entryFunction` only holds the last one translated, and is null for a
+  // library without entry points (e.g. only `export` functions), so collect
+  // them all instead.
+  llvm::SmallVector<SpirvFunction *, 4> entryFunctions;
+  for (const FunctionInfo *entryInfo : workQueue)
+    if (entryInfo->isEntryFunction && entryInfo->entryFunction)
+      entryFunctions.push_back(entryInfo->entryFunction);
+
   if (spirvOptions.enableMaximalReconvergence) {
-    spvBuilder.addExecutionMode(entryFunction,
-                                spv::ExecutionMode::MaximallyReconvergesKHR, {},
-                                SourceLocation());
+    for (SpirvFunction *entry : entryFunctions)
+      spvBuilder.addExecutionMode(entry,
+                                  spv::ExecutionMode::MaximallyReconvergesKHR,
+                                  {}, SourceLocation());
   }
 
   for (const FunctionInfo *entryInfo : workQueue) {
@@ -901,14 +911,18 @@ void SpirvEmitter::HandleTranslationUnit(ASTContext &context) {
   }
 
   // For Vulkan 1.2 and later, add SignedZeroInfNanPreserve when -Gis is
-  // provided to preserve NaN/Inf and signed zeros.
-  if (spirvOptions.IEEEStrict) {
+  // provided to preserve NaN/Inf and signed zeros. This is an entry point
+  // property: a library without entry points still gets NoContraction on its
+  // arithmetic (see EmitVisitor), and the module it is linked into must declare
+  // the execution mode on its own entry point.
+  if (spirvOptions.IEEEStrict && !entryFunctions.empty()) {
     if (featureManager.getSpirvVersion(featureManager.getTargetEnv()) <
         VersionTuple(1, 2))
       spvBuilder.requireExtension("SPV_KHR_float_controls", SourceLocation());
-    spvBuilder.addExecutionMode(entryFunction,
-                                spv::ExecutionMode::SignedZeroInfNanPreserve,
-                                {32}, SourceLocation());
+    for (SpirvFunction *entry : entryFunctions)
+      spvBuilder.addExecutionMode(entry,
+                                  spv::ExecutionMode::SignedZeroInfNanPreserve,
+                                  {32}, SourceLocation());
     spvBuilder.requireCapability(spv::Capability::SignedZeroInfNanPreserve,
                                  SourceLocation());
   }
@@ -916,11 +930,13 @@ void SpirvEmitter::HandleTranslationUnit(ASTContext &context) {
   llvm::StringRef denormMode = spirvOptions.floatDenormalMode;
   if (!denormMode.empty()) {
     if (denormMode.equals_lower("preserve")) {
-      spvBuilder.addExecutionMode(entryFunction,
-                                  spv::ExecutionMode::DenormPreserve, {32}, {});
+      for (SpirvFunction *entry : entryFunctions)
+        spvBuilder.addExecutionMode(entry, spv::ExecutionMode::DenormPreserve,
+                                    {32}, {});
     } else if (denormMode.equals_lower("ftz")) {
-      spvBuilder.addExecutionMode(
-          entryFunction, spv::ExecutionMode::DenormFlushToZero, {32}, {});
+      for (SpirvFunction *entry : entryFunctions)
+        spvBuilder.addExecutionMode(
+            entry, spv::ExecutionMode::DenormFlushToZero, {32}, {});
     } else if (denormMode.equals_lower("any")) {
       // Do nothing. Since any behavior is allowed, we could optionally choose
       // to translate to DenormPreserve or DenormFlushToZero if one was known to
